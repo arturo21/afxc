@@ -1,19 +1,19 @@
 /**
- * AFXC: AVFenix Compiler Engine (v8.0.0 - Full Production Enterprise Edition)
+ * AFXC: AVFenix Compiler Engine (v9.0.0 - Production Enterprise Edition with Export & Alias Support)
  * Transpilador y Motor de Compilación Oficial para AVFenix Types.
  * 
- * Implementación de los 4 Puntos Críticos de Producción:
- *  1. Sistema de Importación y Grafo de Dependencias (import / export multi-archivo).
- *  2. Lexer / Tokenizador AST con reporte de errores por Línea y Columna.
- *  3. Instanciación de Componentes Personalizados (PascalCase) y soporte props.children / Slots.
- *  4. CLI de Producción y Configuración Dinámica (afxc.config.json).
+ * Novedades v9.0.0:
+ *  1. Soporte completo para palabras clave 'export' (export schema, export component, export extension, export plugin).
+ *  2. Soporte para alias de importación (import { Specifier as Alias } from "...").
+ *  3. Formateador y limpiador de espacio en blanco en el Emitter para código JS de producción ultra-limpio.
+ *  4. Grafo de dependencias multi-archivo recursivo con detección de ciclos y Source Maps V3.
  */
 
 const fs = require('fs');
 const path = require('path');
 
 // =========================================================================
-// PUNTO 2: LEXER / TOKENIZADOR AST Y MANEJO DE ERRORES CON LÍNEA Y COLUMNA
+// LEXER / TOKENIZADOR AST Y MANEJO DE ERRORES CON LÍNEA Y COLUMNA
 // =========================================================================
 
 class AFXCLexer {
@@ -45,7 +45,6 @@ class AFXCLexer {
     while (this.pos < this.source.length) {
       const ch = this.source[this.pos];
 
-      // Salto de línea
       if (ch === '\n') {
         this.line++;
         this.col = 1;
@@ -53,14 +52,12 @@ class AFXCLexer {
         continue;
       }
 
-      // Espacios en blanco
       if (/\s/.test(ch)) {
         this.col++;
         this.pos++;
         continue;
       }
 
-      // Comentarios de línea //
       if (ch === '/' && this.source[this.pos + 1] === '/') {
         while (this.pos < this.source.length && this.source[this.pos] !== '\n') {
           this.pos++;
@@ -68,7 +65,6 @@ class AFXCLexer {
         continue;
       }
 
-      // Comentarios multilínea /* ... */
       if (ch === '/' && this.source[this.pos + 1] === '*') {
         const startLine = this.line;
         const startCol = this.col;
@@ -91,7 +87,6 @@ class AFXCLexer {
         continue;
       }
 
-      // Cadenas de texto "..." o '...'
       if (ch === '"' || ch === "'") {
         const quote = ch;
         const startLine = this.line;
@@ -118,7 +113,6 @@ class AFXCLexer {
         continue;
       }
 
-      // Identificadores y Palabras Clave
       if (/[a-zA-Z_$]/.test(ch)) {
         const startCol = this.col;
         let ident = "";
@@ -133,7 +127,6 @@ class AFXCLexer {
         continue;
       }
 
-      // Símbolos y Operadores
       tokens.push({ type: 'SYMBOL', value: ch, line: this.line, col: this.col });
       this.pos++;
       this.col++;
@@ -144,12 +137,12 @@ class AFXCLexer {
 }
 
 // =========================================================================
-// MOTOR PRINCIPAL COMPILADOR AFXC v8.0.0
+// MOTOR PRINCIPAL COMPILADOR AFXC v9.0.0
 // =========================================================================
 
 class AFXC {
   constructor(options = {}) {
-    this.version = "8.0.0";
+    this.version = "9.0.0";
     this.options = Object.assign({
       verbose: true,
       strictMode: false,
@@ -162,16 +155,12 @@ class AFXC {
   }
 
   // =========================================================================
-  // PUNTO 1: RESOLUCIÓN DE MÓDULOS Y GRAFO DE DEPENDENCIAS (import / export)
+  // RESOLUCIÓN DE MÓDULOS Y GRAFO DE DEPENDENCIAS (import / export)
   // =========================================================================
 
-  /**
-   * Compila un proyecto multi-archivo a partir de un punto de entrada.
-   * Resuelve el grafo de dependencias y previene importaciones circulares.
-   */
   compileProject(entryFilePath, options = {}) {
     const absEntryPath = path.resolve(this.options.rootDir, entryFilePath);
-    const visitedFiles = new Map(); // path -> { schemas, components, clientJS, imports }
+    const visitedFiles = new Map();
     const circularCheckStack = new Set();
 
     const processFile = (filePath) => {
@@ -192,21 +181,18 @@ class AFXC {
       const sourceCode = fs.readFileSync(normalizedPath, 'utf8');
       const filename = path.basename(normalizedPath);
 
-      // Lexer check para reporte de errores sintácticos
+      // Lexer check
       const lexer = new AFXCLexer(sourceCode, filename);
-      lexer.tokenize(); // Lanza SyntaxError con línea y columna si falla
+      lexer.tokenize();
 
-      // Extraer imports
       const imports = this.parseImports(sourceCode, normalizedPath);
 
-      // Procesar módulos importados recursivamente
       const importedModules = [];
       for (const imp of imports) {
         const moduleResult = processFile(imp.resolvedPath);
         importedModules.push({ importInfo: imp, moduleResult });
       }
 
-      // Compilar módulo individual
       const singleResult = this.compileCode(sourceCode, path.basename(normalizedPath, '.avf'), normalizedPath);
 
       const moduleRecord = {
@@ -225,7 +211,6 @@ class AFXC {
 
     const entryRecord = processFile(absEntryPath);
 
-    // Fusionar manifiesto CMS global
     const mergedEntities = [];
     const mergedComponents = [];
     const allDiagnostics = [];
@@ -274,11 +259,15 @@ class AFXC {
 
   parseImports(source, currentFilePath) {
     const imports = [];
-    const importRegex = /import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"]/g;
+    const importRegex = /import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"];?/g;
     let match;
 
     while ((match = importRegex.exec(source)) !== null) {
-      const rawSpecifiers = match[1].split(',').map(s => s.trim()).filter(Boolean);
+      const rawSpecifiers = match[1].split(',').map(s => {
+        const parts = s.trim().split(/\s+as\s+/);
+        return parts.length > 1 ? { local: parts[1], imported: parts[0] } : { local: parts[0], imported: parts[0] };
+      }).filter(s => s.imported);
+
       const importPath = match[2];
       const resolvedPath = path.resolve(path.dirname(currentFilePath), importPath.endsWith('.avf') ? importPath : `${importPath}.avf`);
 
@@ -313,15 +302,11 @@ ${bundledJsParts.join('\n\n')}`;
       this.hoistedNodes = [];
       this.hoistedCounter = 0;
 
-      // 1. Lexer Check
       const lexer = new AFXCLexer(sourceCode, `${filename}.avf`);
       lexer.tokenize();
 
-      // 2. Extraer esquemas y componentes
       const schemas = this.parseSchemas(sourceCode);
       const components = this.parseComponentMetadata(sourceCode);
-
-      // 3. Type-Checker Estático
       const diagnostics = this.typeCheck(sourceCode, schemas, components);
       const hasErrors = diagnostics.some(d => d.severity === 'error');
 
@@ -329,10 +314,7 @@ ${bundledJsParts.join('\n\n')}`;
         throw new Error(`[Type-Checker] Se encontraron ${diagnostics.filter(d => d.severity === 'error').length} errores de tipado en modo estricto.`);
       }
 
-      // 4. Emitir Código JS
       const clientJS = this.emitClientCode(sourceCode, schemas, filename);
-
-      // 5. Source Map V3
       const sourceMap = this.generateSourceMap(sourceCode, clientJS, `${filename}.avf`, `${filename}.js`);
 
       const manifest = {
@@ -395,7 +377,7 @@ ${bundledJsParts.join('\n\n')}`;
     fs.writeFileSync(sourceMapPath, JSON.stringify(result.sourceMap, null, 2), 'utf8');
 
     if (this.options.verbose) {
-      console.log(`\x1b[32m[AFXC SUCCESS v8.0.0]\x1b[0m Proyecto compilado exitosamente para: \x1b[36m${baseName}.avf\x1b[0m`);
+      console.log(`\x1b[32m[AFXC SUCCESS v${this.version}]\x1b[0m Proyecto compilado exitosamente para: \x1b[36m${baseName}.avf\x1b[0m`);
       console.log(`  └─ Manifiesto CMS: \x1b[33m${manifestPath}\x1b[0m`);
       console.log(`  └─ Bundle Cliente: \x1b[33m${clientJsPath}\x1b[0m`);
       console.log(`  └─ Source Map V3: \x1b[33m${sourceMapPath}\x1b[0m`);
@@ -472,7 +454,7 @@ ${bundledJsParts.join('\n\n')}`;
 
   findBlocks(source, keyword) {
     const blocks = [];
-    const pattern = new RegExp(`\\b${keyword}\\s+(\\w+)\\s*\\{`, 'g');
+    const pattern = new RegExp(`(?:export\\s+)?\\b${keyword}\\s+(\\w+)\\s*\\{`, 'g');
     let match;
 
     while ((match = pattern.exec(source)) !== null) {
@@ -522,7 +504,7 @@ ${bundledJsParts.join('\n\n')}`;
       if (!fieldMatch) continue;
       const [_, fieldName, fieldType, rest] = fieldMatch;
       fields[fieldName] = { type: fieldType, decorators: {} };
-      const decMatches = rest.matchAll(/@(\w+)(?:\((.*?)\))?(?=\s*@|\s*$)/g);
+      const decMatches = rest.matchAll(/@(\w+)(?:\\((.*?)\\))?(?=\\s*@|\\s*$)/g);
       for (const dm of decMatches) {
         fields[fieldName].decorators[dm[1]] = this.parseDecoratorArgs(dm[2] || "");
       }
@@ -533,7 +515,7 @@ ${bundledJsParts.join('\n\n')}`;
   parseDecoratorArgs(argsStr) {
     if (!argsStr.trim()) return true;
     const result = {};
-    const argRegex = /(\w+)\s*:\s*(?:\"([^\"]*)\"|'([^']*)'|(\\[.*?\\])|(true|false|\\d+|\\w+))/g;
+    const argRegex = /(\w+)\s*:\s*(?:\"([^\"]*)\"|'([^']*)'|(\[.*?\])|(true|false|\d+|\w+))/g;
     let match;
     while ((match = argRegex.exec(argsStr)) !== null) {
       const [_, key, strVal1, strVal2, arrVal, rawVal] = match;
@@ -565,10 +547,6 @@ ${bundledJsParts.join('\n\n')}`;
     }
     return components;
   }
-
-  // =========================================================================
-  // PUNTO 3: INSTANCIACIÓN DE COMPONENTES PERSONALIZADOS Y props.children / Slots
-  // =========================================================================
 
   parseJSXProps(attrsStr) {
     if (!attrsStr.trim()) return { propsJS: "{}", isStatic: true };
@@ -723,9 +701,6 @@ ${bundledJsParts.join('\n\n')}`;
     return { childrenJS: children.join(", "), isStatic };
   }
 
-  /**
-   * Distingue entre elementos HTML nativos y Componentes Personalizados (PascalCase)
-   */
   parseJSXElement(code, startIdx) {
     const nameMatch = code.substring(startIdx).match(/^<(\w+)/);
     if (!nameMatch) return null;
@@ -778,7 +753,6 @@ ${bundledJsParts.join('\n\n')}`;
     const closeTagLen = `</${tagName}>`.length;
     const isElementStatic = !isCustomComponent && propsStatic && childrenStatic;
 
-    // Inyección de props.children para componentes personalizados
     let vnodeCode = "";
     if (isCustomComponent) {
       vnodeCode = childrenJS
@@ -873,21 +847,21 @@ ${bundledJsParts.join('\n\n')}`;
     // 1. Eliminar declaraciones 'import ... from ...'
     code = code.replace(/import\s*\{[^}]+\}\s*from\s*['"][^'"]+['"];?/g, '');
 
-    // 2. Eliminar bloques 'schema'
+    // 2. Eliminar bloques 'schema' (incluyendo 'export schema')
     const schemaBlocks = this.findBlocks(code, "schema");
     for (let i = schemaBlocks.length - 1; i >= 0; i--) {
       const b = schemaBlocks[i];
       code = code.slice(0, b.start) + code.slice(b.end);
     }
 
-    // 3. Transpilar 'extension Name { ... }'
+    // 3. Transpilar 'extension Name { ... }' y 'export extension Name { ... }'
     const extBlocks = this.findBlocks(code, "extension");
     for (let i = extBlocks.length - 1; i >= 0; i--) {
       const b = extBlocks[i];
       code = code.slice(0, b.start) + `genrl.extend("${b.name}", {\n${b.body.trim()}\n});` + code.slice(b.end);
     }
 
-    // 4. Transpilar 'plugin Name { ... }'
+    // 4. Transpilar 'plugin Name { ... }' y 'export plugin Name { ... }'
     const pluginBlocks = this.findBlocks(code, "plugin");
     for (let i = pluginBlocks.length - 1; i >= 0; i--) {
       const b = pluginBlocks[i];
@@ -897,8 +871,11 @@ ${bundledJsParts.join('\n\n')}`;
     // 5. Transpilar JSX
     code = this.transpileJSX(code);
 
-    // 6. Transpilar componentes
-    code = code.replace(/\bcomponent\s+(\w+)\s*\{/g, 'class $1 extends reactv.Componente {');
+    // 6. Transpilar componentes (soporta 'component Name' y 'export component Name')
+    code = code.replace(/(?:export\s+)?\bcomponent\s+(\w+)\s*\{/g, 'class $1 extends reactv.Componente {');
+
+    // 7. Limpiar líneas en blanco consecutivas
+    code = code.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
 
     const hoistedDeclarations = this.hoistedNodes.length > 0
       ? `// Nodos JSX Elevados (AST Static Hoisting)\n` + this.hoistedNodes.map(h => `const ${h.varName} = ${h.code};`).join('\n') + `\n\n`
@@ -940,7 +917,7 @@ ${this.indentCode(hoistedDeclarations + code, 6)}
 }
 
 // =========================================================================
-// PUNTO 4: CLI DE PRODUCCIÓN Y ARCHIVO DE CONFIGURACIÓN (afxc.config.json)
+// CLI DE PRODUCCIÓN Y ARCHIVO DE CONFIGURACIÓN (afxc.config.json)
 // =========================================================================
 
 function runCLI() {
@@ -1009,10 +986,10 @@ function runCLI() {
     return;
   }
 
-  console.log(`\x1b[33mUso de AFXC CLI v8 Enterprise:\x1b[0m
-  node afxc-v8.js init                      Crea afxc.config.json
-  node afxc-v8.js build [entrada] [salida]  Compila el proyecto
-  node afxc-v8.js check [entrada]           Ejecuta solo comprobación de tipos`);
+  console.log(`\x1b[33mUso de AFXC CLI v9 Enterprise:\x1b[0m
+  node afxc-v9.js init                      Crea afxc.config.json
+  node afxc-v9.js build [entrada] [salida]  Compila el proyecto
+  node afxc-v9.js check [entrada]           Ejecuta solo comprobación de tipos`);
 }
 
 if (typeof require !== 'undefined' && require.main === module) {

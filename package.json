@@ -1,0 +1,41 @@
+{
+  "name": "afxc",
+  "version": "9.0.0",
+  "description": "Compilador oficial de AVFenix Types para General.JS y CMS dinámicos. Genera salida dual con Type-Checker estático, AST Static Hoisting, Source Maps V3 y soporte multi-archivo.",
+  "main": "afxc-v9.js",
+  "bin": {
+    "afxc": "./afxc-v9.js"
+  },
+  "scripts": {
+    "start": "node afxc-v9.js",
+    "build": "node afxc-v9.js build",
+    "check": "node afxc-v9.js check",
+    "init": "node afxc-v9.js init",
+    "test": "node afxc.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arturo21/afxc.git"
+  },
+  "keywords": [
+    "avfenix",
+    "compiler",
+    "generaljs",
+    "reactive",
+    "routing",
+    "cms",
+    "jsx",
+    "type-checker",
+    "ast-hoisting",
+    "source-map"
+  ],
+  "author": "Arturo Vasquez",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/arturo21/afxc/issues"
+  },
+  "homepage": "https://github.com/arturo21/afxc#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

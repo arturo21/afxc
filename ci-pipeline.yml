@@ -28,14 +28,17 @@ jobs:
       - name: Install Dependencies
         run: npm ci || npm install
 
-      - name: Run Static Code Analysis & Syntax Check
-        run: node afxc-v8.js check
+      - name: Run Static Code Analysis & Type Check
+        run: npm run check
 
       - name: Execute Unit & Integration Test Suite
         run: npm test
 
       - name: Build Project & Generate CMS Manifests + Bundles
-        run: node afxc-v8.js build
+        run: npm run build
+
+      - name: Validate NPM Package Packing
+        run: npm pack --dry-run
 
       - name: Upload Build Dist Artifacts
         uses: actions/upload-artifact@v4

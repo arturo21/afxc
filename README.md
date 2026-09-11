@@ -1,20 +1,21 @@
-# 🦅 AVFenix Types & AFXC Compiler Engine (`v8.0.0`)
+# 🦅 AVFenix Types & AFXC Compiler Engine (`v9.0.0`)
 
-**AFXC (AVFenix Compiler Engine)** es el motor de transpilación oficial para **AVFenix Types**, diseñado específicamente para el ecosistema de **General.JS** (`gnrl.js`, `reactive.general.js` y `routing.general.js`).
+**AFXC (AVFenix Compiler Engine)** es el motor de transpilación y compilación oficial para **AVFenix Types**, diseñado específicamente para el ecosistema de **General.JS** (`gnrl.js`, `reactive.general.js` y `routing.general.js`).
 
-A diferencia de los transpiladores tradicionales que eliminan los tipos (*Type Erasure*), **AFXC** implementa **Persistencia de Esquema Dual**: compila un único archivo `.avf` generando simultáneamente un **Manifiesto de Entidades JSON** para el backend del CMS y un **Bundle JavaScript de Cliente** optimizado para el navegador.
+A diferencia de los transpiladores tradicionales que eliminan los tipos (*Type Erasure*), **AFXC** implementa **Persistencia de Esquema Dual**: compila un proyecto `.avf` generando simultáneamente un **Manifiesto de Entidades JSON** para el backend del CMS y un **Bundle JavaScript de Cliente** optimizado para el navegador.
 
 ---
 
-## 🌟 Características Principales
+## 🌟 Características Principales (v9.0.0 Enterprise)
 
-* 🔗 **Grafo de Dependencias Multi-Archivo (`import / export`):** Resuelve recursivamente proyectos estructurados en múltiples archivos `.avf`, previniendo importaciones circulares y fusionando los esquemas en un manifiesto único.
-* 🎯 **Lexer AST con Diagnóstico Preciso:** Tokenizador sintáctico que intercepta errores e informa la **línea y columna exacta** del fallo con punteros visuales.
-* 🧩 **Soporte JSX Nativo & Slots (`props.children`):** Instanciación automática de componentes personalizados (PascalCase) e inyección de elementos hijos dinámicos para el Virtual DOM.
-* ⚡ **AST Static Hoisting:** Identifica nodos JSX estáticos y los eleva fuera del ciclo de renderizado (`template`), acelerando las comparaciones `diff()` y `patch()` de `reactive.general.js`.
-* 🛡️ **Type-Checker Estático Semántico:** Verifica la validez de entidades, relaciones `@link`, reglas de rango `@validate` y widgets `@ui` en tiempo de compilación.
-* 🗺️ **Source Maps V3 (Base64 VLQ):** Mapeo de código para depuración directa sobre las líneas del archivo `.avf` en las DevTools del navegador.
-* ⚙️ **CLI de Producción & Configuration File:** Soporte para `afxc.config.json` y comandos de consola (`init`, `check`, `build`).
+* 🔗 **Grafo de Dependencias Multi-Archivo (`import / export`):** Resuelve recursivamente proyectos divididos en múltiples archivos `.avf`, gestionando alias de importación (`import { Specifier as Alias }`) y previniendo dependencias circulares.
+* 📦 **Soporte Nativo de Exportación:** Admite cláusulas `export` en esquemas, componentes, extensiones y plugins (`export schema`, `export component`, etc.), limpiándolas en el bundle cliente para su ejecución segura dentro del contexto `genrl.safeEval()`.
+* 🎯 **Lexer AST con Diagnóstico Preciso:** Tokenizador sintáctico que intercepta errores e informa la **línea y columna exacta** del fallo con punteros visuales en la consola.
+* 🧩 **Soporte JSX Nativo & Slots (`props.children`):** Instanciación de componentes personalizados (PascalCase) e inyección de elementos hijos dinámicos dentro del Virtual DOM de **reactive.general.js**.
+* ⚡ **AST Static Hoisting:** Identifica subárboles JSX estáticos y los eleva fuera del ciclo de renderizado (`template`), reduciendo el trabajo del algoritmo `diff()` y `patch()`.
+* 🛡️ **Type-Checker Estático Semántico:** Verifica entidades, relaciones `@link`, reglas de rango `@validate` y widgets `@ui` en tiempo de compilación.
+* 🗺️ **Source Maps V3 (Base64 VLQ):** Mapeo de código estandarizado para depuración directa sobre las líneas del archivo `.avf` en las DevTools del navegador.
+* ⚙️ **CLI Oficial & `afxc.config.json`:** Comandos de consola integrados (`npx afxc init`, `npx afxc check`, `npx afxc build`) para flujos de desarrollo local y CI/CD.
 
 ---
 
@@ -26,42 +27,41 @@ Cuando **AFXC** procesa un módulo `.avf`, genera tres artefactos en la carpeta 
 proyecto/
 ├── src/
 │   ├── User.avf
-│   └── Article.avf
+│   └── MainApp.avf
 ├── dist/
-│   ├── Article.schema.json   <-- Manifiesto Tipado para el CMS (Backend / DB / UI)
-│   ├── Article.js            <-- Bundle Cliente enlazado a General.JS
-│   └── Article.js.map        <-- Source Map V3 (Depuración)
+│   ├── MainApp.schema.json   <-- Manifiesto Tipado Consolidado para el CMS
+│   ├── MainApp.js            <-- Bundle Cliente enlazado a General.JS
+│   └── MainApp.js.map        <-- Source Map V3 (Depuración)
 └── afxc.config.json
 ```
 
-1. **`[Modulo].schema.json`**: Contiene la definición de datos, tipos, decoradores `@ui` y `@validate`, relaciones relacionales e informe de diagnósticos del Type-Checker.
+1. **`[Modulo].schema.json`**: Contiene la definición consolidada de datos, tipos, decoradores `@ui` y `@validate`, relaciones relacionales e informe de diagnósticos del Type-Checker.
 2. **`[Modulo].js`**: Código ejecutable envuelto en el patrón **Module Revealed**, protegido dentro de `genrl.run()` y `genrl.safeEval()` para evitar fallos globales en producción.
-3. **`[Modulo].js.map`**: Mapeo estandarizado Base64 VLQ para inspección de código.
+3. **`[Modulo].js.map`**: Mapeo estandarizado Base64 VLQ para inspección de código fuente original.
 
 ---
 
 ## 🚀 Guía de Inicio Rápido
 
-### 1. Instalación y Requisitos
-Asegúrate de contar con **Node.js** (v18.0.0 o superior) y las librerías base del ecosistema en el cliente (`gnrl.js`, `reactive.general.js`, `routing.general.js`).
+### 1. Instalación
+Puedes instalar **AFXC** en tu proyecto mediante NPM:
 
 ```bash
-# Instalación del núcleo General.JS vía NPM
-npm install gnrl.js
+npm install -D afxc gnrl.js
 ```
 
-### 2. Crear Archivo de Configuración
-Inicializa el archivo de configuración en la raíz de tu proyecto:
+### 2. Inicializar Configuración (`afxc.config.json`)
+Crea el archivo de configuración en la raíz de tu proyecto:
 
 ```bash
-node afxc-v8.js init
+npx afxc init
 ```
 
 Esto generará un archivo `afxc.config.json`:
 
 ```json
 {
-  "entry": "./src/Main.avf",
+  "entry": "./src/MainApp.avf",
   "outDir": "./dist",
   "strictMode": false,
   "cmsManifest": true,
@@ -69,78 +69,72 @@ Esto generará un archivo `afxc.config.json`:
 }
 ```
 
-### 3. Verificación de Tipos (Sin Emitir Archivos)
-Ejecuta el Type-Checker estático para analizar el proyecto:
+### 3. Verificación Estática de Tipos
+Ejecuta el Type-Checker semántico sin emitir archivos:
 
 ```bash
-node afxc-v8.js check
+npx afxc check
 ```
 
 ### 4. Compilación de Producción
-Genera el bundle cliente y el manifiesto CMS:
+Compila el proyecto y genera los artefactos en `/dist`:
 
 ```bash
-node afxc-v8.js build
+npx afxc build
 ```
 
 ---
 
 ## 📝 Guía de Sintaxis `.avf`
 
-### 1. Declaración de Esquema CMS (`schema`)
+### 1. Declaración de Esquema CMS (`export schema`)
 Define entidades de base de datos e interfaz administrativa con decoradores:
 
 ```typescript
-schema Article {
-  title: string @ui(widget: "text-input", label: "Título Principal", required: true);
-  content: text @ui(widget: "rich-editor");
-  views: number @validate(min: 0);
-  status: string @ui(widget: "select", options: ["draft", "published"]);
-  author: User @link(relation: "many-to-one");
+export schema User {
+  nombre: string @ui(widget: "text-input", label: "Nombre Completo", required: true);
+  email: string @validate(type: "email") @ui(widget: "email-input");
+  rol: string @ui(widget: "select", options: ["admin", "editor", "user"]);
 }
 ```
 
-### 2. Componentes Reactivos (`component`)
-Componentes visuales con estado, ciclo de vida (`onMount`, `onDestroy`) y JSX declarativo:
+### 2. Componentes Reactivos e Importaciones (`import / export component`)
+Componentes visuales con estado, ciclo de vida (`onMount`, `onDestroy`), alias e instanciación JSX:
 
 ```typescript
-import { UserBadge } from "./User.avf";
+import { User as UserModel } from "./User.avf";
 
-component ArticleCard {
-  state = { likes: 0 };
-
-  onMount() {
-    this.setState({ likes: this.props.initialLikes || 0 });
-  }
+export component UserCard {
+  state = { expanded: false };
 
   template(state) {
     return (
-      <article class="card">
-        <h2>{this.props.title}</h2>
-        <UserBadge name={this.props.authorName} />
-        <button onClick={() => this.setState({ likes: state.likes + 1 })}>
-          Me gusta ({state.likes})
+      <div class="user-card">
+        <h3>{this.props.user ? this.props.user.nombre : "Invitado"}</h3>
+        <button onClick={() => this.setState({ expanded: !state.expanded })}>
+          {state.expanded ? "Ocultar Detalle" : "Ver Detalle"}
         </button>
-      </article>
+        {state.expanded ? (
+          <p>Email: {this.props.user ? this.props.user.email : "N/A"}</p>
+        ) : null}
+      </div>
     );
   }
 }
 ```
 
 ### 3. Extensiones y Plugins (`extension` / `plugin`)
-Integración directa con las capacidades de extensión de **General.JS**:
+Integración con el sistema de extensión modular de **General.JS**:
 
 ```typescript
-// Extiende las utilidades de General.JS (genrl.extend)
-extension ArticleUtils {
-  formatSlug(title) {
-    return title.toLowerCase().replace(/\s+/g, '-');
+export extension UserUtils {
+  formatTag(user) {
+    return user ? "@" + user.nombre.toLowerCase().replace(/\s+/g, '_') : "Anonimo";
   }
 }
 
-// Registra un plugin seguro (genrl.use)
-plugin AuditPlugin {
-  General.log("Plugin de auditoría inicializado");
+export plugin SecurityPlugin {
+  General.log("Plugin de seguridad inicializado");
 }
 ```
 
@@ -148,8 +142,8 @@ plugin AuditPlugin {
 Mapeo de navegación sin recargar la página mediante `routing.general.js`:
 
 ```typescript
-routing.map("/article/:id").to((params) => {
-  new ArticleCard({ id: params.id }, "#app-root");
+routing.map("/user/:id").to((params) => {
+  new UserCard({ id: params.id }, "#app-root");
 });
 ```
 
@@ -157,14 +151,14 @@ routing.map("/article/:id").to((params) => {
 
 ## 🧪 Pruebas Automatizadas y CI/CD
 
-El repositorio incluye una suite completa de pruebas unitarias (`afxc.test.js`) y una plantilla de integración continua (`ci-pipeline.yml`):
+El paquete incluye una suite completa de pruebas de integración (`afxc.test.js`) y configuración para **GitHub Actions** (`ci-pipeline.yml`):
 
 ```bash
-# Ejecución de tests automatizados
+# Ejecutar la suite de pruebas unitarias
 npm test
 ```
 
-El pipeline de **GitHub Actions** ejecuta la matriz de pruebas en Node.js 18, 20 y 22, validando la construcción de distribuidos y verificando que no existan regresiones en el parser AST ni en el grafo de módulos.
+El pipeline de CI/CD ejecuta las pruebas en Node.js 18, 20 y 22, asegurando la calidad del código en cada `push` o `pull_request`.
 
 ---
 
