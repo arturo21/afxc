@@ -1,212 +1,179 @@
 # 🦅 AVFenix Types & AFXC Compiler Engine (`v10.0.0`)
 
-> **Motor de Transpilación Enterprise & Persistencia de Esquema Dual** para el ecosistema **General.JS** (`gnrl.js`, `reactive.general.js`, `routing.general.js`) y arquitecturas de Backend Fuerte con **MariaDB & Alembic**.
+**AFXC (AVFenix Compiler Engine v10.0.0 Enterprise Edition)** es el motor de transpilación oficial para **AVFenix Types**, diseñado específicamente para el ecosistema full-stack de **General.JS** (`gnrl.js`, `reactive.general.js` y `routing.general.js`).
+
+A diferencia de los transpiladores tradicionales que eliminan los tipos (*Type Erasure*), **AFXC** implementa **Persistencia de Esquema Dual**: compila un único archivo `.avf` generando simultáneamente un **Manifiesto de Entidades JSON** (`.schema.json`) para la API backend/CMS y un **Bundle JavaScript de Cliente** (`.js`) optimizado para el navegador.
 
 ---
 
-## 📐 Arquitectura de Salida Dual
+## 🌟 Características Principales
 
-**AFXC (AVFenix Compiler Engine)** elimina la pérdida de tipos (*Type Erasure*) mediante un enfoque de **Persistencia de Esquema Dual**. A partir de archivos fuente `.avf`, compila simultáneamente un manifiesto JSON para backend/BBDD y un bundle JavaScript optimizado para el cliente.
-
-```
-                  ┌───────────────────────────────┐
-                  │      ModuloFuente.avf         │
-                  └──────────────┬────────────────┘
-                                 │
-                                 ▼
-                     ┌──────────────────────┐
-                     │   AFXC Compiler v10  │
-                     └───────────┬──────────┘
-                                 │
-         ┌───────────────────────┼───────────────────────┐
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐
-│  .schema.json    │   │      .js         │   │    .js.map       │
-│ Manifiesto CMS / │   │ Bundle Cliente   │   │ Source Maps V3   │
-│ Backend / MariaDB│   │ (General.JS / VDOM)│  │ (Depuración VLQ) │
-└──────────────────┘   └──────────────────┘   └──────────────────┘
-```
+* 🔗 **Grafo de Dependencias Multi-Archivo (`import / export`):** Resuelve recursivamente proyectos estructurados en múltiples archivos `.avf`, previniendo importaciones circulares y fusionando los esquemas en un manifiesto único.
+* 🎯 **Lexer AST con Diagnóstico Preciso:** Tokenizador sintáctico que intercepta errores e informa la **línea y columna exacta** del fallo con punteros visuales.
+* 🧩 **Soporte JSX Nativo & Slots (`props.children`):** Instanciación automática de componentes personalizados (PascalCase) e inyección de elementos hijos dinámicos para el Virtual DOM.
+* ⚡ **AST Static Hoisting:** Identifica nodos JSX estáticos y los eleva fuera del ciclo de renderizado (`template`), acelerando las comparaciones `diff()` y `patch()` de `reactive.general.js`.
+* 🛡️ **Type-Checker Estático Semántico:** Verifica la validez de entidades, relaciones `@link`, reglas de rango `@validate` y widgets `@ui` en tiempo de compilación.
+* 🎨 **Generación de Formularios Dinámicos UI:** Lectura de decoradores `@ui` para instanciar automáticamente controles de formulario (`text-input`, `select`, `toggle`, `rich-editor`) sin escribir HTML redundante.
+* 🗄️ **Integración Backend & MariaDB / Alembic:** Generación automática de modelos ORM para SQLAlchemy, sincronización de bases de datos MariaDB y control de versiones de esquemas con Alembic (`upgrade` / `downgrade`).
+* 🗺️ **Source Maps V3 (Base64 VLQ):** Mapeo de código para depuración directa sobre las líneas del archivo `.avf` en las DevTools del navegador.
+* ⚙️ **CLI de Producción & Configuration File:** Soporte para `afxc.config.json` y comandos de consola (`init`, `check`, `build`).
 
 ---
 
-## ⚡ Matriz de Características Principales
+## 📦 Arquitectura de Salida Dual
 
-| Característica | Descripción |
-| :--- | :--- |
-| 🛡️ **Type-Checker Estático** | Analiza reglas semánticas, campos requeridos, rangos `@validate` e integridad `@link` en tiempo de compilación. |
-| ⚡ **AST Static Hoisting** | Eleva nodos JSX estáticos fuera del ciclo de renderizado (`template`), acelerando las comparaciones `diff()`/`patch()`. |
-| 🔗 **Grafo Multi-Archivo & Alias** | Soporta `export schema/component` e importaciones avanzadas (`import { Specifier as Alias } from "./Module.avf"`). |
-| 🌐 **Validador HTTP Runtime** | Middleware para **Express.js**, **Fastify** y **Flask** (`avfenix-validator.js`) que valida payloads JSON sin duplicar código. |
-| 🗄️ **MariaDB & Alembic ORM** | Genera modelos SQLAlchemy (`avfenix_mariadb.py`) y gestiona migraciones de base de datos automatizadas (`avfenix_alembic-v2.py`). |
-| ⚡ **DevServer Live Reload** | Servidor HTTP nativo sin dependencias externas (`dev-server.js`) con auto-compilación y recarga por SSE. |
+Cuando **AFXC** procesa un módulo `.avf`, genera tres artefactos en la carpeta de distribución (`/dist`):
+
+```text
+proyecto/
+├── src/
+│   ├── User.avf
+│   └── Article.avf
+├── dist/
+│   ├── Article.schema.json   <-- Manifiesto Tipado para el CMS y Backend API
+│   ├── Article.js            <-- Bundle Cliente enlazado a General.JS
+│   └── Article.js.map        <-- Source Map V3 (Depuración)
+└── afxc.config.json
+```
+
+1. **`[Modulo].schema.json`**: Contiene la definición de datos, tipos, decoradores `@ui` y `@validate`, relaciones relacionales e informe de diagnósticos del Type-Checker.
+2. **`[Modulo].js`**: Código ejecutable envuelto en el patrón **Module Revealed**, protegido dentro de `genrl.run()` y `genrl.safeEval()` para evitar fallos globales en producción.
+3. **`[Modulo].js.map`**: Mapeo estandarizado Base64 VLQ para inspección de código.
 
 ---
 
-## 🗄️ Integración con MariaDB y Gestión de Migraciones con Alembic
+## 🚀 Guía de Inicio Rápido
 
-### 1. Arquitectura de Mapeo de Datos
+### 1. Instalación y Requisitos
+Asegúrate de contar con **Node.js** (v18.0.0 o superior) y las librerías base del ecosistema en el cliente (`gnrl.js`, `reactive.general.js`, `routing.general.js`).
 
-AFXC transforma las definiciones `.avf` en esquemas declarativos de SQLAlchemy orientados a **MariaDB**:
-
-```
-Definición .avf  ──►  Manifiesto .schema.json  ──►  SQLAlchemy (MariaDB)  ──►  Alembic Migration
-```
-
-#### Tabla de Mapeo de Tipos
-| AVFenix Type | Decoradores | Tipo MariaDB | Constraint Generated |
-| :--- | :--- | :--- | :--- |
-| `string` | `@ui(required: true)` | `VARCHAR(255)` | `NOT NULL` |
-| `string` | `@validate(max: 100)` | `VARCHAR(100)` | Límite de caracteres |
-| `text` | `@ui(widget: "rich-editor")` | `TEXT` | Texto largo |
-| `number` | `@validate(min: 0)` | `BIGINT` / `FLOAT` | Validación en Check / Application Level |
-| `boolean` | Predeterminado `false` | `TINYINT(1)` / `BOOLEAN` | Predeterminado `FALSE` |
-| `date` | Timestamp ISO | `DATETIME` | Nullable / Not Null |
-| `@link` | `relation: "many-to-one"` | `INTEGER` | `FOREIGN KEY (autor_id) REFERENCES users(id)` |
-
----
-
-### 2. Comportamiento de Alembic con MariaDB
-
-El gestor de migraciones **`avfenix_alembic.py`** sincroniza las entidades `.avf` con la base de datos MariaDB siguiendo un ciclo de vida transparente:
-
-```
-                          ┌───────────────────────────┐
-                          │   Modificación .avf       │
-                          └─────────────┬─────────────┘
-                                        │
-                                        ▼
-                          ┌───────────────────────────┐
-                          │  npx afxc build (.json)   │
-                          └─────────────┬─────────────┘
-                                        │
-                                        ▼
-                          ┌───────────────────────────┐
-                          │ Modelos SQLAlchemy        │
-                          │   (models_mariadb.py)     │
-                          └─────────────┬─────────────┘
-                                        │
-                                        ▼
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                      Alembic Migration Engine (MariaDB)                       │
-├───────────────────────────────────────────────────────────────────────────────┤
-│ 1. Inspección Schema Vivo ◄──► Comparación MetaData SQLAlchemy                │
-│ 2. Detección de Cambios (ADD COLUMN, DROP COLUMN, ALTER TABLE, FOREIGN KEYS)   │
-│ 3. Generación Script en alembic/versions/XXXX_migracion.py                    │
-└──────────────────────────────────────┬────────────────────────────────────────┘
-                                       │
-                    ┌──────────────────┴──────────────────┐
-                    ▼                                     ▼
-      ┌───────────────────────────┐         ┌───────────────────────────┐
-      │     upgrade_db()          │         │    downgrade_db()         │
-      │  Aplica cambios a MariaDB │         │ Rollback de migraciones   │
-      └─────────────┬─────────────┘         └─────────────┬─────────────┘
-                    │                                     │
-                    └──────────────────┬──────────────────┘
-                                       │
-                                       ▼
-                          ┌───────────────────────────┐
-                          │ Tabla 'alembic_version'   │
-                          │   actualizada en MariaDB  │
-                          └───────────────────────────┘
+```bash
+# Instalación de dependencias del proyecto
+npm install
 ```
 
-#### Operaciones Soportadas en MariaDB
-* **Adición/Eliminación de Campos:** Detecta nuevos atributos o campos eliminados en archivos `.avf` e interactúa con `ALTER TABLE`.
-* **Modificación de Tipos y Tamaños:** Ajusta el tipo de columna en MariaDB (ej. amplía `VARCHAR(50)` a `VARCHAR(255)`).
-* **Restricciones de Clave Foránea (`@link`):** Crea y destruye relaciones referenciales relacionales (`FOREIGN KEY`).
-* **Seguridad de Reversión:** Todas las migraciones implementan funciones pareadas `upgrade()` y `downgrade()` automáticas.
+### 2. Crear Archivo de Configuración
+Inicializa el archivo de configuración en la raíz de tu proyecto:
 
----
-
-### 3. Guía de Uso del Gestor de Migraciones (`avfenix_alembic-v2.py`)
-
-#### Inicialización del Entorno
-Configura la cadena de conexión de MariaDB e inicializa la estructura de Alembic:
-
-```python
-from avfenix_alembic import AVFenixAlembicManager
-
-MARIADB_URL = "mysql+pymysql://usuario:password@localhost:3306/mi_base_datos"
-
-manager = AVFenixAlembicManager(db_url=MARIADB_URL)
-manager.init_alembic()
+```bash
+npx afxc init
+# O ejecutas directamente: node afxc.js init
 ```
 
-#### Generación de Migraciones Automáticas (`autogenerate`)
-Compara el esquema activo en MariaDB contra los modelos generados por AFXC:
+Esto generará un archivo `afxc.config.json`:
 
-```python
-manager.create_migration(message="agregar_campo_telefono_usuario")
-```
-
-#### Aplicación de Migraciones (`upgrade`)
-Actualiza MariaDB a la revisión más reciente (`head`):
-
-```python
-manager.upgrade_db()
-```
-
-#### Reversión / Rollback (`downgrade`)
-Revierte cambios de forma segura en caso de incidencias en producción:
-
-```python
-# Revertir la última migración (1 nivel hacia atrás)
-manager.downgrade_db(target="-1")
-
-# Revertir 2 migraciones hacia atrás
-manager.downgrade_db(target="-2")
-
-# Volver al estado inicial limpio (base)
-manager.downgrade_db(target="base")
-
-# Volver a un ID de revisión específico
-manager.downgrade_db(target="4f8a2c1b9e0d")
-```
-
----
-
-## 📝 Guía de Sintaxis `.avf`
-
-### 1. Declaración de Esquema (`schema` / `export schema`)
-
-```typescript
-export schema User {
-  nombre: string @ui(widget: "text-input", label: "Nombre Completo", required: true);
-  email: string @validate(type: "email");
-  edad: number @validate(min: 18, max: 120);
-  bio: text @ui(widget: "rich-editor");
-  activo: boolean;
-}
-
-export schema Article {
-  titulo: string @ui(label: "Título Principal", required: true);
-  contenido: text;
-  autor: User @link(relation: "many-to-one");
+```json
+{
+  "entry": "./src/Main.avf",
+  "outDir": "./dist",
+  "strictMode": false,
+  "cmsManifest": true,
+  "sourceMap": true
 }
 ```
 
-### 2. Componentes Reactivos & JSX (`component` / `export component`)
+### 3. Verificación de Tipos (Sin Emitir Archivos)
+Ejecuta el Type-Checker estático para analizar el proyecto:
 
+```bash
+npm run check
+```
+
+### 4. Compilación de Producción
+Genera el bundle cliente, el manifiesto CMS y los Source Maps:
+
+```bash
+npm run build
+```
+
+---
+
+## 🎨 Formularios Dinámicos Guiados por Metadatos `@ui`
+
+Una de las capacidades más potentes de **AVFenix Types** es la generación automática de interfaces de usuario a partir del manifiesto de esquema `.schema.json`. Al definir un `schema` con decoradores `@ui`, no es necesario escribir código HTML repetitivo para formularios de creación o edición.
+
+### 1. Definición del Esquema `.avf`
 ```typescript
-import { UserBadge } from "./User.avf";
+schema Producto {
+  nombre: string @ui(widget: "text-input", label: "Nombre del Producto", required: true, placeholder: "Ej. Laptop Pro 15");
+  precio: number @validate(min: 0, max: 100000) @ui(widget: "number-input", label: "Precio ($USD)");
+  categoria: string @ui(widget: "select", label: "Categoría", options: ["Electrónica", "Hogar", "Ropa"]);
+  descripcion: text @ui(widget: "rich-editor", label: "Descripción Detallada");
+  disponible: boolean @ui(widget: "toggle", label: "Disponible para Venta");
+}
+```
 
-export component ArticleCard {
-  state = { likes: 0 };
+### 2. Componente de Formulario Automático (`AutoForm`)
+Este componente dinámico lee la definición del manifiesto en tiempo de ejecución y renderiza el control correspondiente para cada campo:
 
-  onMount() {
-    this.setState({ likes: this.props.initialLikes || 0 });
+```javascript
+/**
+ * AutoForm: Componente que renderiza dinámicamente formularios basados en metadatos @ui
+ */
+class AutoForm extends reactv.Componente {
+  state = { formData: {}, errors: [] };
+
+  renderWidget(fieldName, fieldInfo) {
+    const ui = (fieldInfo.decorators && fieldInfo.decorators.ui) || {};
+    const label = ui.label || fieldName;
+    const widget = ui.widget || "text-input";
+    const required = ui.required ? true : false;
+    const value = this.state.formData[fieldName] || "";
+
+    const updateField = (val) => {
+      this.setState({
+        formData: Object.assign({}, this.state.formData, { [fieldName]: val })
+      });
+    };
+
+    switch (widget) {
+      case "select":
+        return (
+          <div class="form-group">
+            <label>{label} {required ? "*" : ""}</label>
+            <select class="form-control" onChange={(e) => updateField(e.target.value)}>
+              <option value="">-- Seleccionar --</option>
+              {(ui.options || []).map(opt => <option value={opt}>{opt}</option>)}
+            </select>
+          </div>
+        );
+
+      case "toggle":
+        return (
+          <div class="form-group form-check">
+            <input type="checkbox" class="form-check-input" checked={!!value} onChange={(e) => updateField(e.target.checked)} />
+            <label class="form-check-label">{label}</label>
+          </div>
+        );
+
+      case "number-input":
+        return (
+          <div class="form-group">
+            <label>{label} {required ? "*" : ""}</label>
+            <input type="number" class="form-control" value={value} onInput={(e) => updateField(Number(e.target.value))} />
+          </div>
+        );
+
+      case "text-input":
+      default:
+        return (
+          <div class="form-group">
+            <label>{label} {required ? "*" : ""}</label>
+            <input type="text" class="form-control" placeholder={ui.placeholder || ""} value={value} onInput={(e) => updateField(e.target.value)} />
+          </div>
+        );
+    }
   }
 
   template(state) {
+    const schema = this.props.schemaManifest; // Recibe el .schema.json de AFXC
+    const fields = (schema && schema.entities && schema.entities[0] && schema.entities[0].fields) || {};
+
     return (
-      <article class="card">
-        <h2>{this.props.titulo}</h2>
-        <UserBadge name={this.props.authorName} />
-        <button onClick={() => this.setState({ likes: state.likes + 1 })}>
-          Me gusta ({state.likes})
-        </button>
-      </article>
+      <form onSubmit={(e) => { e.preventDefault(); this.props.onSubmit(state.formData); }}>
+        {Object.keys(fields).map(fName => this.renderWidget(fName, fields[fName]))}
+        <button type="submit" class="btn btn-primary">Guardar Registro</button>
+      </form>
     );
   }
 }
@@ -214,66 +181,51 @@ export component ArticleCard {
 
 ---
 
-## 🌐 Validador Runtime HTTP Backend (`avfenix-validator.js`)
+## 🗄️ Persistencia en Backend: MariaDB y Alembic
 
-Middleware para **Express.js** y **Fastify** que valida solicitudes contra el manifiesto `.schema.json`:
+**AVFenix Types** permite sincronizar los esquemas de datos con la base de datos **MariaDB** y gestionar el historial de versiones con **Alembic**:
 
-```javascript
-const express = require('express');
-const AVFenixValidator = require('./avfenix-validator.js');
+### 1. Modelos ORM para SQLAlchemy (`avfenix_mariadb.py`)
+```python
+from avfenix_mariadb import generate_sqlalchemy_file, AVFenixMariaDBSync
 
-const app = express();
-app.use(express.json());
+# Genera la capa declarativa de SQLAlchemy mapeada a MariaDB
+generate_sqlalchemy_file("dist/Producto.schema.json", "models_mariadb.py")
 
-const validator = new AVFenixValidator('./dist/App.schema.json');
+# Sincroniza directamente las tablas en MariaDB
+syncer = AVFenixMariaDBSync("dist/Producto.schema.json")
+syncer.sync_db("mysql+pymysql://usuario:password@localhost:3306/mi_db")
+```
 
-// Validación automática de payload HTTP contra la entidad 'User'
-app.post('/api/usuarios', validator.expressBody('User'), (req, res) => {
-  res.json({ success: true, data: req.body });
-});
+### 2. Control de Migraciones con Alembic (`avfenix_alembic-v2.py`)
+```python
+from avfenix_alembic import AVFenixAlembicManager
+
+manager = AVFenixAlembicManager("mysql+pymysql://usuario:password@localhost:3306/mi_db")
+
+# Inicializa la estructura de Alembic
+manager.init_alembic()
+
+# Autogenera la migración comparando los modelos .avf con MariaDB
+manager.create_migration("agregar_campo_disponible")
+
+# Aplica las migraciones pendientes a MariaDB
+manager.upgrade_db()
+
+# Revertir / Rollback de la última migración
+manager.downgrade_db(target="-1")
 ```
 
 ---
 
-## 🚀 Guía de Inicio Rápido & CLI
+## 🧪 Pruebas Automatizadas y CI/CD
 
-### Comandos Disponibles (`npx afxc`)
-
-```bash
-# Inicializar archivo de configuración afxc.config.json
-npx afxc init
-
-# Verificación estática de tipos sin emitir archivos
-npx afxc check
-
-# Compilación completa de producción (dist/)
-npx afxc build
-
-# Iniciar servidor de desarrollo con Live Reload
-node dev-server.js
-```
-
----
-
-## 🧪 Pruebas Automatizadas & CI/CD
-
-El proyecto incluye una suite de pruebas automatizadas en **`afxc.test.js`** y configuración para **GitHub Actions** en **`ci-pipeline.yml`**:
+El repositorio includes una suite completa de pruebas unitarias (`afxc.test.js`) y una plantilla de integración continua (`ci-pipeline.yml`):
 
 ```bash
-# Ejecución de la batería completa de pruebas
+# Ejecución de tests automatizados de AFXC v10.0.0
 npm test
 ```
-
----
-
-## 📦 Recursos y Descargables Disponibles
-
-* 📘 **`Guia_Desarrollo_Componentes_AVFenix-v2.pdf`**: Guía ilustrada de desarrollo UI/JSX.
-* 📕 **`Guia_Tipado_Fuerte_AVFenix.pdf`**: Documentación técnica para backend y esquemas.
-* 📦 **`avfenix-starter-kit.zip`**: Plantilla de proyecto preconfigurada con AFXC v10.0.0.
-* ⚡ **`dev-server.js`**: Servidor de desarrollo nativo con Live Reload.
-* 🛡️ **`avfenix-validator.js`**: Middleware de validación HTTP.
-* 🗄️ **`avfenix_mariadb.py`** / **`avfenix_alembic-v2.py`**: Integración con MariaDB y Alembic.
 
 ---
 
