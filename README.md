@@ -1,67 +1,67 @@
-# 🦅 AVFenix Types & AFXC Compiler Engine (`v9.0.0`)
+# 🦅 AVFenix Types & AFXC Compiler Engine (`v10.0.0`)
 
-**AFXC (AVFenix Compiler Engine)** es el motor de transpilación y compilación oficial para **AVFenix Types**, diseñado específicamente para el ecosistema de **General.JS** (`gnrl.js`, `reactive.general.js` y `routing.general.js`).
-
-A diferencia de los transpiladores tradicionales que eliminan los tipos (*Type Erasure*), **AFXC** implementa **Persistencia de Esquema Dual**: compila un proyecto `.avf` generando simultáneamente un **Manifiesto de Entidades JSON** para el backend del CMS y un **Bundle JavaScript de Cliente** optimizado para el navegador.
-
----
-
-## 🌟 Características Principales (v9.0.0 Enterprise)
-
-* 🔗 **Grafo de Dependencias Multi-Archivo (`import / export`):** Resuelve recursivamente proyectos divididos en múltiples archivos `.avf`, gestionando alias de importación (`import { Specifier as Alias }`) y previniendo dependencias circulares.
-* 📦 **Soporte Nativo de Exportación:** Admite cláusulas `export` en esquemas, componentes, extensiones y plugins (`export schema`, `export component`, etc.), limpiándolas en el bundle cliente para su ejecución segura dentro del contexto `genrl.safeEval()`.
-* 🎯 **Lexer AST con Diagnóstico Preciso:** Tokenizador sintáctico que intercepta errores e informa la **línea y columna exacta** del fallo con punteros visuales en la consola.
-* 🧩 **Soporte JSX Nativo & Slots (`props.children`):** Instanciación de componentes personalizados (PascalCase) e inyección de elementos hijos dinámicos dentro del Virtual DOM de **reactive.general.js**.
-* ⚡ **AST Static Hoisting:** Identifica subárboles JSX estáticos y los eleva fuera del ciclo de renderizado (`template`), reduciendo el trabajo del algoritmo `diff()` y `patch()`.
-* 🛡️ **Type-Checker Estático Semántico:** Verifica entidades, relaciones `@link`, reglas de rango `@validate` y widgets `@ui` en tiempo de compilación.
-* 🗺️ **Source Maps V3 (Base64 VLQ):** Mapeo de código estandarizado para depuración directa sobre las líneas del archivo `.avf` en las DevTools del navegador.
-* ⚙️ **CLI Oficial & `afxc.config.json`:** Comandos de consola integrados (`npx afxc init`, `npx afxc check`, `npx afxc build`) para flujos de desarrollo local y CI/CD.
+> **Motor de Compilación, Transpilación y Tipado Fuerte para el Ecosistema General.JS**  
+> *Soporte para Persistencia de Esquema Dual, AST Static Hoisting, Source Maps V3, Validación HTTP y Grafo Multi-Archivo.*
 
 ---
 
-## 📦 Arquitectura de Salida Dual
+## 🌟 Visión General
 
-Cuando **AFXC** procesa un módulo `.avf`, genera tres artefactos en la carpeta de distribución (`/dist`):
+**AFXC (AVFenix Compiler Engine)** es el compilador oficial de **AVFenix Types**. Diseñado para proyectos de alto rendimiento construidos sobre **General.JS** (`gnrl.js`, `reactive.general.js` y `routing.general.js`), AFXC rompe con el paradigma tradicional de *Type Erasure* e implementa **Persistencia de Esquema Dual**:
 
 ```
-proyecto/
-├── src/
-│   ├── User.avf
-│   └── MainApp.avf
-├── dist/
-│   ├── MainApp.schema.json   <-- Manifiesto Tipado Consolidado para el CMS
-│   ├── MainApp.js            <-- Bundle Cliente enlazado a General.JS
-│   └── MainApp.js.map        <-- Source Map V3 (Depuración)
-└── afxc.config.json
+ ┌─────────────────────────────────────────────────────────────────────────────┐
+ │                            Archivo Fuente (.avf)                            │
+ └──────────────────────────────────────┬──────────────────────────────────────┘
+                                        │
+                                 [ AFXC Engine ]
+                                        │
+         ┌──────────────────────────────┼──────────────────────────────┐
+         ▼                              ▼                              ▼
+ ┌───────────────┐              ┌───────────────┐              ┌───────────────┐
+ │ Manifiesto CMS│              │ Bundle JS     │              │ Source Map    │
+ │ .schema.json  │              │ .js           │              │ .js.map (V3)  │
+ └───────┬───────┘              └───────┬───────┘              └───────────────┘
+         │                              │
+         ▼                              ▼
+ ┌───────────────┐              ┌───────────────┐
+ │ Validaciones  │              │ Runtime       │
+ │ Backend / API │              │ General.JS    │
+ └───────────────┘              └───────────────┘
 ```
 
-1. **`[Modulo].schema.json`**: Contiene la definición consolidada de datos, tipos, decoradores `@ui` y `@validate`, relaciones relacionales e informe de diagnósticos del Type-Checker.
-2. **`[Modulo].js`**: Código ejecutable envuelto en el patrón **Module Revealed**, protegido dentro de `genrl.run()` y `genrl.safeEval()` para evitar fallos globales en producción.
-3. **`[Modulo].js.map`**: Mapeo estandarizado Base64 VLQ para inspección de código fuente original.
+1. **Backend / CMS (`.schema.json`)**: Genera manifiestos estructurados con metadatos de UI, tipos, decoradores `@validate`, `@ui`, `@link` y reglas de integridad para bases de datos o validadores HTTP.
+2. **Cliente Web (`.js`)**: Genera bundles JavaScript optimizados con **AST Static Hoisting**, ejecutable de forma segura mediante `genrl.safeEval()` en **General.JS**.
+3. **Depuración (`.js.map`)**: Mapeo estándar Base64 VLQ para inspección de código nativo sobre archivos `.avf` desde las DevTools.
 
 ---
 
-## 🚀 Guía de Inicio Rápido
+## 🚀 Características Clave (Feature Matrix)
 
-### 1. Instalación
-Puedes instalar **AFXC** en tu proyecto mediante NPM:
+| Característica | Descripción | Beneficio Principal |
+| :--- | :--- | :--- |
+| **🛡️ Type-Checker Estático** | Analizador semántico previo a la emisin de código. | Captura errores de tipo y rango en tiempo de compilación. |
+| **⚡ AST Static Hoisting** | Elevación de subárboles JSX estáticos fuera del `template()`. | Optimización masiva del Virtual DOM en `reactive.general.js`. |
+| **🔗 Grafo Multi-Archivo** | `import / export` recursivo con alias (`import { A as B }`). | Modularización completa con prevención de ciclos. |
+| **🌐 Validador Runtime HTTP** | Middleware ejecutable para **Express** y **Fastify** (`avfenix-validator.js`). | Validación automática de payloads HTTP basada en esquemas `.avf`. |
+| **🎯 Lexer de Alta Precisión** | Mapeo exacto de tokens con punteros visuales de línea y columna. | Diagnóstico claro de errores sintácticos. |
+| **🧩 JSX Component Slots** | Instanciación PascalCase e inyección de `props.children`. | Arquitectura de componentes contenedores y reusables. |
+| **⚙️ CLI & Configuración** | Herramienta CLI (`npx afxc`) y archivo `afxc.config.json`. | Fácil integración en scripts de construcción y pipelines CI/CD. |
 
+---
+
+## 🛠️ Instalación y Configuración Rápida
+
+### 1. Inicialización en el Proyecto
 ```bash
-npm install -D afxc gnrl.js
-```
-
-### 2. Inicializar Configuración (`afxc.config.json`)
-Crea el archivo de configuración en la raíz de tu proyecto:
-
-```bash
+# Crear el archivo de configuración afxc.config.json
 npx afxc init
 ```
 
-Esto generará un archivo `afxc.config.json`:
-
+Esto generará la configuración por defecto del compilador:
 ```json
 {
-  "entry": "./src/MainApp.avf",
+  "entry": "./src/Main.avf",
   "outDir": "./dist",
   "strictMode": false,
   "cmsManifest": true,
@@ -69,40 +69,44 @@ Esto generará un archivo `afxc.config.json`:
 }
 ```
 
-### 3. Verificación Estática de Tipos
-Ejecuta el Type-Checker semántico sin emitir archivos:
-
+### 2. Comprobación Estática de Tipos (Sin Emitir Distribuidos)
 ```bash
 npx afxc check
 ```
 
-### 4. Compilación de Producción
-Compila el proyecto y genera los artefactos en `/dist`:
-
+### 3. Compilación de Producción
 ```bash
 npx afxc build
 ```
 
 ---
 
-## 📝 Guía de Sintaxis `.avf`
+## 📝 Guía de Sintaxis del Lenguaje `.avf`
 
-### 1. Declaración de Esquema CMS (`export schema`)
-Define entidades de base de datos e interfaz administrativa con decoradores:
+### A. Declaración de Esquemas (`schema` / `export schema`)
+Define estructuras de datos con tipado fuerte, reglas de validación y componentes visuales para el CMS:
 
 ```typescript
 export schema User {
   nombre: string @ui(widget: "text-input", label: "Nombre Completo", required: true);
   email: string @validate(type: "email") @ui(widget: "email-input");
+  edad: number @validate(min: 18, max: 120);
   rol: string @ui(widget: "select", options: ["admin", "editor", "user"]);
+}
+
+export schema Post {
+  titulo: string @ui(widget: "text-input");
+  cuerpo: text @ui(widget: "rich-editor");
+  vistas: number @validate(min: 0);
+  autor: User @link(relation: "many-to-one");
 }
 ```
 
-### 2. Componentes Reactivos e Importaciones (`import / export component`)
-Componentes visuales con estado, ciclo de vida (`onMount`, `onDestroy`), alias e instanciación JSX:
+### B. Componentes Reactivos (`component`)
+Componentes visuales con ciclo de vida, JSX declarativo, renderizado de componentes hijos y estado reactivo:
 
 ```typescript
-import { User as UserModel } from "./User.avf";
+import { User } from "./User.avf";
 
 export component UserCard {
   state = { expanded: false };
@@ -115,7 +119,9 @@ export component UserCard {
           {state.expanded ? "Ocultar Detalle" : "Ver Detalle"}
         </button>
         {state.expanded ? (
-          <p>Email: {this.props.user ? this.props.user.email : "N/A"}</p>
+          <div class="details">
+            <p>Email: {this.props.user.email}</p>
+          </div>
         ) : null}
       </div>
     );
@@ -123,45 +129,90 @@ export component UserCard {
 }
 ```
 
-### 3. Extensiones y Plugins (`extension` / `plugin`)
-Integración con el sistema de extensión modular de **General.JS**:
-
+### C. Extensiones, Plugins y Rutas SPA
 ```typescript
-export extension UserUtils {
-  formatTag(user) {
-    return user ? "@" + user.nombre.toLowerCase().replace(/\s+/g, '_') : "Anonimo";
+// Extensión de utilidades
+export extension StringHelpers {
+  slugify(text) {
+    return text.toLowerCase().replace(/\s+/g, '-');
   }
 }
 
-export plugin SecurityPlugin {
-  General.log("Plugin de seguridad inicializado");
+// Plugin de auditoría
+export plugin LoggerPlugin {
+  General.log("Módulo inicializado correctamente.");
 }
-```
 
-### 4. Rutas SPA (`routing.map`)
-Mapeo de navegación sin recargar la página mediante `routing.general.js`:
-
-```typescript
-routing.map("/user/:id").to((params) => {
-  new UserCard({ id: params.id }, "#app-root");
+// Enrutamiento SPA
+routing.map("/usuario/:id").to((params) => {
+  new UserCard({ userId: params.id }, "#app-root");
 });
 ```
 
 ---
 
-## 🧪 Pruebas Automatizadas y CI/CD
+## 🌐 Middleware de Validación HTTP Backend (`avfenix-validator.js`)
 
-El paquete incluye una suite completa de pruebas de integración (`afxc.test.js`) y configuración para **GitHub Actions** (`ci-pipeline.yml`):
+Puedes reutilizar las reglas de tipado de tus archivos `.avf` en tu servidor **Node.js** para validar entradas de peticiones HTTP en tiempo de ejecución.
 
-```bash
-# Ejecutar la suite de pruebas unitarias
-npm test
+```javascript
+const express = require('express');
+const AVFenixValidator = require('./avfenix-validator.js');
+
+const app = express();
+app.use(express.json());
+
+// Cargar el manifiesto CMS compilado
+const validator = new AVFenixValidator('./dist/Main.schema.json');
+
+// Validar automáticamente el payload contra la entidad 'User'
+app.post('/api/usuarios', validator.expressBody('User'), (req, res) => {
+  res.json({ status: "success", data: req.body });
+});
 ```
 
-El pipeline de CI/CD ejecuta las pruebas en Node.js 18, 20 y 22, asegurando la calidad del código en cada `push` o `pull_request`.
+Si el cliente envía datos inválidos, el middleware responde automáticamente con `HTTP 400 Bad Request`:
+```json
+{
+  "error": "ValidationError",
+  "entity": "User",
+  "issues": [
+    { "field": "email", "message": "El campo 'email' debe ser un correo electrónico válido." },
+    { "field": "edad", "message": "El campo 'edad' debe ser mayor o igual a 18." }
+  ]
+}
+```
 
 ---
 
-## 📜 Licencia y Autoría
+## 🧪 Pruebas Automatizadas & CI/CD Pipeline
 
-Desarrollado para el ecosistema **General.JS** / **AVFenix**. Distribuido bajo la licencia MIT.
+El proyecto cuenta con una batería de pruebas de integración completa (`afxc.test.js`) y un workflow listo para **GitHub Actions** (`ci-pipeline.yml`):
+
+```bash
+# Ejecutar la suite de pruebas unitarias e integración
+npm test
+```
+
+El pipeline de CI/CD automatiza los siguientes pasos en Node.js 18, 20 y 22:
+1. `npm run check`: Verificación estática de tipos.
+2. `npm test`: Batería de pruebas.
+3. `npm run build`: Generación de distribuidos.
+4. `npm pack --dry-run`: Validación de paquete distribuible.
+
+---
+
+## 📚 Recursos Descargables Incluidos
+
+El repositorio incluye documentación y herramientas listas para descargar:
+
+* 📄 **`Guia_Desarrollo_Componentes_AVFenix-v2.pdf`**: Guía técnica completa sobre arquitectura de componentes, Compound Components, SSR e Hidratación.
+* 📄 **`Guia_Tipado_Fuerte_AVFenix.pdf`**: Guía especializada en el uso exclusivo de esquemas y tipado fuerte para backend/APIs.
+* 📦 **`avfenix-starter-kit.zip`**: Kit de inicio rápido con proyecto preconfigurado.
+* ⚙️ **`avfenix-validator.js`**: Middleware para Express/Fastify.
+
+---
+
+## 📜 Licencia y Ecosistema
+
+Desarrollado para el ecosistema **General.JS** / **AVFenix**. Distribuido bajo la Licencia **MIT**.

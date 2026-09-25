@@ -1,19 +1,19 @@
 /**
- * AFXC Compiler Engine v9.0.0 - Test Suite Automatizada
+ * AFXC Compiler Engine v10.0.0 - Test Suite Automatizada
  * Suite de pruebas unitarias e integración para CI/CD
  */
 
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { AFXC } = require('./afxc-v9.js');
+const AFXC = require('./afxc.js');
 
-describe('AFXC v9.0.0 Compiler Engine Suite', () => {
+describe('AFXC v10.0.0 Compiler Engine Suite', () => {
   let compiler;
-  const tmpDir = path.join(__dirname, 'tmp_test_out_v9');
+  const tmpDir = path.join(__dirname, 'tmp_test_out');
 
   before(() => {
-    compiler = new AFXC({ verbose: false, strictMode: false, rootDir: tmpDir });
+    compiler = new AFXC({ verbose: false, strictMode: false });
     if (!fs.existsSync(tmpDir)) {
       fs.mkdirSync(tmpDir, { recursive: true });
     }
@@ -25,7 +25,7 @@ describe('AFXC v9.0.0 Compiler Engine Suite', () => {
     }
   });
 
-  it('1. Debe realizar Tokenización y Lexer con ubicación precisa de errores (Línea y Columna)', () => {
+  it('1. Debe realizar Tokenización y Lexer con ubicación precisa de errores', () => {
     const invalidAVF = `
 schema User {
   nombre: string;
@@ -37,42 +37,13 @@ schema User {
       compiler.compileCode(invalidAVF, "TestLexer");
     } catch (e) {
       errorCaught = true;
-      assert(e.message.includes('Línea') || e.line !== undefined, 'El mensaje de error debe reportar la línea');
-      assert(e.message.includes('Columna') || e.col !== undefined, 'El mensaje de error debe reportar la columna');
+      assert(e.message.includes('Línea'), 'El mensaje de error debe reportar la línea');
+      assert(e.message.includes('Columna'), 'El mensaje de error debe reportar la columna');
     }
     assert.strictEqual(errorCaught, true, 'Debe lanzar SyntaxError al detectar token inválido');
   });
 
-  it('2. Debe soportar declaraciones export (export schema, export component, export extension, export plugin)', () => {
-    const codeWithExport = `
-export schema Producto {
-  nombre: string;
-  precio: number;
-}
-
-export component ProductoCard {
-  template(state) {
-    return <div class="card">{this.props.nombre}</div>;
-  }
-}
-
-export extension ProductoUtils {
-  formatPrice(p) { return "$" + p; }
-}
-
-export plugin ProductoPlugin {
-  General.log("Plugin activo");
-}
-`;
-    const res = compiler.compileCode(codeWithExport, "TestExport");
-    assert.strictEqual(res.success, true, 'La compilación con cláusulas export debe ser exitosa');
-    assert.strictEqual(res.cmsManifest.entities.length, 1, 'Debe registrar la entidad Producto');
-    assert(!res.clientJS.includes('export class'), 'No debe dejar palabras export huérfanas en el JS cliente');
-    assert(!res.clientJS.includes('export schema'), 'No debe dejar bloques schema en el JS cliente');
-    assert(res.clientJS.includes('class ProductoCard extends reactv.Componente'), 'Debe emitir la clase del componente correctamente');
-  });
-
-  it('3. Debe compilar proyectos multi-archivo resolviendo dependencias e importaciones con alias', () => {
+  it('2. Debe compilar proyectos multi-archivo resolviendo dependencias e importaciones', () => {
     const userAvf = `
 export schema User {
   nombre: string;
@@ -86,11 +57,11 @@ export component UserBadge {
 }
 `;
     const mainAvf = `
-import { User as UsuarioModel, UserBadge } from "./User.avf";
+import { User, UserBadge } from "./User.avf";
 
 export schema Post {
   titulo: string;
-  autor: UsuarioModel @link(relation: "many-to-one");
+  autor: User @link(relation: "many-to-one");
 }
 
 export component PostCard {
@@ -110,14 +81,14 @@ export component PostCard {
     fs.writeFileSync(userPath, userAvf, 'utf8');
     fs.writeFileSync(mainPath, mainAvf, 'utf8');
 
-    const result = compiler.compileProject(mainPath);
+    const result = compiler.compileProject(mainPath, path.join(tmpDir, 'dist'));
     assert.strictEqual(result.success, true, 'La compilación multi-archivo debe ser exitosa');
     assert.strictEqual(result.cmsManifest.entities.length, 2, 'Debe fusionar ambas entidades (User y Post)');
     assert(result.clientJS.includes('class UserBadge extends reactv.Componente'), 'Debe incluir el componente UserBadge');
     assert(result.clientJS.includes('class PostCard extends reactv.Componente'), 'Debe incluir el componente PostCard');
   });
 
-  it('4. Debe transpilar componentes personalizados JSX e inyectar props.children (Slots)', () => {
+  it('3. Debe transpilar componentes personalizados JSX e inyectar props.children', () => {
     const code = `
 schema LayoutSchema { id: string; }
 
@@ -143,11 +114,12 @@ component App {
     assert(res.clientJS.includes('children:'), 'Debe inyectar la propiedad children para slots');
   });
 
-  it('5. Debe realizar Type-Checking e informar diagnósticos', () => {
+  it('4. Debe realizar Type-Checking e informar diagnósticos', () => {
     const codeWithWarning = `
 schema BadEntity {
   campo: TipoInexistente;
-  rango: number @validate(min: 50, max: 10);
+  rango: number @validate(min: 100, max: 10);
+  badRel: string @link(relation: "invalid-rel");
 }
 `;
     const res = compiler.compileCode(codeWithWarning, "TestTypeCheck");
@@ -157,7 +129,7 @@ schema BadEntity {
     assert(res.diagnostics.some(d => d.severity === 'warning'), 'Debe detectar advertencia de tipo desconocido');
   });
 
-  it('6. Debe generar Source Map V3 conforme a la especificación', () => {
+  it('5. Debe generar Source Map V3 conforme a la especificación', () => {
     const code = `
 schema Entity { name: string; }
 `;

@@ -1,12 +1,13 @@
 /**
- * AFXC: AVFenix Compiler Engine (v9.0.0 - Production Enterprise Edition with Export & Alias Support)
+ * AFXC: AVFenix Compiler Engine (v10.0.0 - Production Enterprise Edition)
  * Transpilador y Motor de Compilación Oficial para AVFenix Types.
  * 
- * Novedades v9.0.0:
- *  1. Soporte completo para palabras clave 'export' (export schema, export component, export extension, export plugin).
- *  2. Soporte para alias de importación (import { Specifier as Alias } from "...").
- *  3. Formateador y limpiador de espacio en blanco en el Emitter para código JS de producción ultra-limpio.
- *  4. Grafo de dependencias multi-archivo recursivo con detección de ciclos y Source Maps V3.
+ * Novedades v10.0.0:
+ *  1. Corrección del parser de decoradores con soporte completo para expresiones y arreglos.
+ *  2. Balanceo de llaves con reconocimiento de cadenas de texto en expresiones JSX.
+ *  3. Limpieza universal de cláusulas 'export' y 'export default' para compatibilidad genrl.safeEval().
+ *  4. Modulo CommonJS híbrido compatible con 'const AFXC = require(...)' y 'const { AFXC } = require(...)'.
+ *  5. Grafo de dependencias multi-archivo recursivo con detección de ciclos y Source Maps V3.
  */
 
 const fs = require('fs');
@@ -137,12 +138,12 @@ class AFXCLexer {
 }
 
 // =========================================================================
-// MOTOR PRINCIPAL COMPILADOR AFXC v9.0.0
+// MOTOR PRINCIPAL COMPILADOR AFXC v10.0.0
 // =========================================================================
 
 class AFXC {
   constructor(options = {}) {
-    this.version = "9.0.0";
+    this.version = "10.0.0";
     this.options = Object.assign({
       verbose: true,
       strictMode: false,
@@ -263,9 +264,9 @@ class AFXC {
     let match;
 
     while ((match = importRegex.exec(source)) !== null) {
-      const rawSpecifiers = match[1].split(',').map(s => {
+      const rawSpecifiers = match[1].replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '').split(',').map(s => {
         const parts = s.trim().split(/\s+as\s+/);
-        return parts.length > 1 ? { local: parts[1], imported: parts[0] } : { local: parts[0], imported: parts[0] };
+        return parts.length > 1 ? { local: parts[1].trim(), imported: parts[0].trim() } : { local: parts[0].trim(), imported: parts[0].trim() };
       }).filter(s => s.imported);
 
       const importPath = match[2];
@@ -454,7 +455,7 @@ ${bundledJsParts.join('\n\n')}`;
 
   findBlocks(source, keyword) {
     const blocks = [];
-    const pattern = new RegExp(`(?:export\\s+)?\\b${keyword}\\s+(\\w+)\\s*\\{`, 'g');
+    const pattern = new RegExp(`(?:export\\s+)?(?:default\\s+)?\\b${keyword}\\s+(\\w+)\\s*\\{`, 'g');
     let match;
 
     while ((match = pattern.exec(source)) !== null) {
@@ -496,15 +497,15 @@ ${bundledJsParts.join('\n\n')}`;
 
   parseFields(body) {
     const fields = {};
-    const lines = body.trim().split(';');
-    for (let line of lines) {
+    const statements = this.splitStatements(body);
+    for (let line of statements) {
       line = line.trim();
       if (!line || line.startsWith('//')) continue;
       const fieldMatch = line.match(/^(\w+)\s*:\s*(\w+)(.*)$/);
       if (!fieldMatch) continue;
       const [_, fieldName, fieldType, rest] = fieldMatch;
       fields[fieldName] = { type: fieldType, decorators: {} };
-      const decMatches = rest.matchAll(/@(\w+)(?:\\((.*?)\\))?(?=\\s*@|\\s*$)/g);
+      const decMatches = rest.matchAll(/@(\w+)(?:\((.*?)\))?(?=\s*@|\s*$)/g);
       for (const dm of decMatches) {
         fields[fieldName].decorators[dm[1]] = this.parseDecoratorArgs(dm[2] || "");
       }
@@ -512,10 +513,41 @@ ${bundledJsParts.join('\n\n')}`;
     return fields;
   }
 
+  splitStatements(body) {
+    const statements = [];
+    let current = "";
+    let inStr = null;
+    let parenDepth = 0;
+
+    for (let i = 0; i < body.length; i++) {
+      const ch = body[i];
+      if (inStr) {
+        current += ch;
+        if (ch === inStr && body[i - 1] !== '\\') inStr = null;
+      } else if (ch === '"' || ch === "'") {
+        inStr = ch;
+        current += ch;
+      } else if (ch === '(') {
+        parenDepth++;
+        current += ch;
+      } else if (ch === ')') {
+        if (parenDepth > 0) parenDepth--;
+        current += ch;
+      } else if (ch === ';' && parenDepth === 0) {
+        statements.push(current);
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+    if (current.trim()) statements.push(current);
+    return statements;
+  }
+
   parseDecoratorArgs(argsStr) {
     if (!argsStr.trim()) return true;
     const result = {};
-    const argRegex = /(\w+)\s*:\s*(?:\"([^\"]*)\"|'([^']*)'|(\[.*?\])|(true|false|\d+|\w+))/g;
+    const argRegex = /(\w+)\s*:\s*(?:"([^"]*)"|'([^']*)'|(\[.*?\])|(true|false|\d+|\w+))/g;
     let match;
     while ((match = argRegex.exec(argsStr)) !== null) {
       const [_, key, strVal1, strVal2, arrVal, rawVal] = match;
@@ -572,10 +604,19 @@ ${bundledJsParts.join('\n\n')}`;
         } else if (i < str.length && str[i] === '{') {
           let bDepth = 1;
           const startB = i + 1;
+          let inS = null;
           i++;
           while (i < str.length && bDepth > 0) {
-            if (str[i] === '{') bDepth++;
-            else if (str[i] === '}') bDepth--;
+            const ch = str[i];
+            if (inS) {
+              if (ch === inS && str[i - 1] !== '\\') inS = null;
+            } else if (ch === '"' || ch === "'" || ch === '`') {
+              inS = ch;
+            } else if (ch === '{') {
+              bDepth++;
+            } else if (ch === '}') {
+              bDepth--;
+            }
             i++;
           }
           let expr = str.substring(startB, i - 1).trim();
@@ -679,10 +720,19 @@ ${bundledJsParts.join('\n\n')}`;
         flushText();
         let bDepth = 1;
         const startB = i + 1;
+        let inS = null;
         i++;
         while (i < innerContent.length && bDepth > 0) {
-          if (innerContent[i] === '{') bDepth++;
-          else if (innerContent[i] === '}') bDepth--;
+          const c = innerContent[i];
+          if (inS) {
+            if (c === inS && innerContent[i - 1] !== '\\') inS = null;
+          } else if (c === '"' || c === "'" || c === '`') {
+            inS = c;
+          } else if (c === '{') {
+            bDepth++;
+          } else if (c === '}') {
+            bDepth--;
+          }
           i++;
         }
         let expr = innerContent.substring(startB, i - 1).trim();
@@ -845,7 +895,7 @@ ${bundledJsParts.join('\n\n')}`;
     let code = source;
 
     // 1. Eliminar declaraciones 'import ... from ...'
-    code = code.replace(/import\s*\{[^}]+\}\s*from\s*['"][^'"]+['"];?/g, '');
+    code = code.replace(/import\s*(?:\{[^}]+\}|\*\s*as\s+\w+|\w+)\s*from\s*['"][^'"]+['"];?/g, '');
 
     // 2. Eliminar bloques 'schema' (incluyendo 'export schema')
     const schemaBlocks = this.findBlocks(code, "schema");
@@ -871,10 +921,13 @@ ${bundledJsParts.join('\n\n')}`;
     // 5. Transpilar JSX
     code = this.transpileJSX(code);
 
-    // 6. Transpilar componentes (soporta 'component Name' y 'export component Name')
-    code = code.replace(/(?:export\s+)?\bcomponent\s+(\w+)\s*\{/g, 'class $1 extends reactv.Componente {');
+    // 6. Transpilar componentes (soporta 'component Name', 'export component Name', 'export default component Name')
+    code = code.replace(/(?:export\s+)?(?:default\s+)?\bcomponent\s+(\w+)\s*\{/g, 'class $1 extends reactv.Componente {');
 
-    // 7. Limpiar líneas en blanco consecutivas
+    // 7. Limpiar cualquier palabra clave 'export' o 'export default' remanente
+    code = code.replace(/\bexport\s+(?:default\s+)?/g, '');
+
+    // 8. Limpiar líneas en blanco consecutivas
     code = code.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
 
     const hoistedDeclarations = this.hoistedNodes.length > 0
@@ -986,14 +1039,16 @@ function runCLI() {
     return;
   }
 
-  console.log(`\x1b[33mUso de AFXC CLI v9 Enterprise:\x1b[0m
-  node afxc-v9.js init                      Crea afxc.config.json
-  node afxc-v9.js build [entrada] [salida]  Compila el proyecto
-  node afxc-v9.js check [entrada]           Ejecuta solo comprobación de tipos`);
+  console.log(`\x1b[33mUso de AFXC CLI v10 Enterprise:\x1b[0m
+  node afxc.js init                      Crea afxc.config.json
+  node afxc.js build [entrada] [salida]  Compila el proyecto
+  node afxc.js check [entrada]           Ejecuta solo comprobación de tipos`);
 }
 
 if (typeof require !== 'undefined' && require.main === module) {
   runCLI();
 }
 
-module.exports = { AFXC, AFXCLexer };
+AFXC.AFXC = AFXC;
+AFXC.AFXCLexer = AFXCLexer;
+module.exports = AFXC;
